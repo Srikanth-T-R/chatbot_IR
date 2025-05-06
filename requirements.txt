@@ -1,0 +1,10 @@
+streamlit
+langchain
+langchain-community
+faiss-cpu
+transformers
+accelerate
+bitsandbytes<2
+sentence-transformers
+pypdf
+torch>=2.0.0
