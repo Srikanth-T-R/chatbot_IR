@@ -325,10 +325,10 @@ with st.expander("💻 System Configuration", expanded=False):
                     device = "cuda" if torch.cuda.is_available() else "cpu"
                     st.info(f"Using device: {device}") # Keep the existing info message
 
-                    # Load embeddings, explicitly specifying the device
+# Load embeddings, passing the device parameter through client_kwargs
                     embeddings = HuggingFaceEmbeddings(
                     model_name=EMBEDDING_MODEL_NAME,
-                    device=device )# <--- ADD THIS LINE
+                    client_kwargs={'device': device})# <--- ADD THIS LINE
                     st.success("Embedding model loaded successfully.")
 
                     # Load existing FAISS index
