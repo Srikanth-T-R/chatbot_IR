@@ -1,10 +1,10 @@
+
 streamlit
-langchain
 langchain-community
-faiss-cpu
+sentence-transformers # <-- Make sure this is included!
 transformers
-accelerate
-bitsandbytes<2
-sentence-transformers
-pypdf
-torch>=2.0.0
+torch
+faiss-cpu # or faiss-gpu if you need GPU support for FAISS itself
+bitsandbytes # <-- Needed for 4-bit quantization on GPU
+accelerate # <-- Often needed for quantization/device_map="auto"
+pynvml # <-- Optional, for detailed GPU stats in sidebar
