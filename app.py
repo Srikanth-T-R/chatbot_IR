@@ -327,10 +327,10 @@ with st.expander("💻 System Configuration", expanded=False):
 
 # Load embeddings, passing the device parameter through client_kwargs
                     embeddings = HuggingFaceEmbeddings(
-                    model_name=EMBEDDING_MODEL_NAME,
-                    client_kwargs={'device': device})# <--- ADD THIS LINE
-                    st.success("Embedding model loaded successfully.")
-
+    model_name=EMBEDDING_MODEL_NAME,
+    model_kwargs={'device': device} # <--- Try passing device via model_kwargs
+    # Keep allow_dangerous_deserialization at the FAISS loading step, not here
+)
                     # Load existing FAISS index
                     db = FAISS.load_local(
                         faiss_index_path,
