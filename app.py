@@ -10,7 +10,7 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, logging as hf_logging
 import logging # Import standard logging
-
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 # Suppress Hugging Face logging messages that aren't warnings or errors
 hf_logging.set_verbosity_warning()
 logging.basicConfig(level=logging.WARNING) # Set root logger level to warning
