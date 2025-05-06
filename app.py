@@ -328,7 +328,7 @@ with st.expander("💻 System Configuration", expanded=False):
                     # Load embeddings, explicitly specifying the device
                     embeddings = HuggingFaceEmbeddings(
                     model_name=EMBEDDING_MODEL_NAME,
-                    device=device # <--- ADD THIS LINE)
+                    device=device )# <--- ADD THIS LINE
                     st.success("Embedding model loaded successfully.")
 
                     # Load existing FAISS index
