@@ -1,10 +1,9 @@
-
 streamlit
 langchain-community
-sentence-transformers # <-- Make sure this is included!
+sentence-transformers
 transformers
-torch
-faiss-cpu # or faiss-gpu if you need GPU support for FAISS itself
-bitsandbytes # <-- Needed for 4-bit quantization on GPU
-accelerate # <-- Often needed for quantization/device_map="auto"
-pynvml # <-- Optional, for detailed GPU stats in sidebar
+torch # The version *with* CUDA support (e.g., torch==2.2.0+cu121 - check Streamlit Cloud docs for recommended version)
+faiss-cpu # Use faiss-gpu if you built the index with GPU, otherwise cpu is fine
+bitsandbytes
+accelerate
+pynvml # (Optional, for better GPU info in sidebar)
