@@ -321,7 +321,14 @@ with st.expander("💻 System Configuration", expanded=False):
             with st.spinner("Initializing knowledge system..."):
                 try:
                     # Load embeddings
-                    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
+                    # Determine the device before loading
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                    st.info(f"Using device: {device}") # Keep the existing info message
+
+                    # Load embeddings, explicitly specifying the device
+                    embeddings = HuggingFaceEmbeddings(
+                    model_name=EMBEDDING_MODEL_NAME,
+                    device=device # <--- ADD THIS LINE)
                     st.success("Embedding model loaded successfully.")
 
                     # Load existing FAISS index
