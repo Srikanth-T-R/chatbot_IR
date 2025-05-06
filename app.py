@@ -325,7 +325,7 @@ with st.expander("💻 System Configuration", expanded=False):
                     device = "cuda" if torch.cuda.is_available() else "cpu"
                     st.info(f"Using device: {device}") # Keep the existing info message
 
-# Load embeddings, passing the device parameter through client_kwargs
+# Load embeddings, passing the device parameter through model_kwargs
                     embeddings = HuggingFaceEmbeddings(
     model_name=EMBEDDING_MODEL_NAME,
     model_kwargs={'device': device} # <--- Try passing device via model_kwargs
