@@ -2,9 +2,10 @@
 streamlit
 langchain
 langchain-google-genai
+google-generativeai  # Add this line if not already present
 sentence-transformers
 faiss-cpu
 torch
 accelerate
 google-auth
-python-dotenv # Optional, for .env file method
+python-dotenv
