@@ -19,7 +19,7 @@ GEMINI_MODEL_NAME = "models/gemini-1.5-flash-latest" # or "gemini-pro" if prefer
 # !!! WARNING: HARDCODING API KEYS IS A SECURITY RISK !!!
 # !!! Only do this for quick, local, temporary testing. !!!
 # !!! DO NOT commit this to version control or share it. !!!
-GOOGLE_API_KEY = "YOUR_ACTUAL_GOOGLE_API_KEY_HERE" # <--- PASTE YOUR KEY HERE
+GOOGLE_API_KEY = "AIzaSyBkjbOBbc8XpWGNN8lStFCnIbu3MO9vhug" # <--- PASTE YOUR KEY HERE
 
 # Remove or comment out the previous API key loading logic:
 # load_dotenv()
