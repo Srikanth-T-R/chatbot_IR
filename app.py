@@ -23,7 +23,19 @@ st.set_page_config(
 )
 
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-LLM_MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+
+# --- CHANGE THIS LINE ---
+# You need to find a different, smaller LLM that is chat-tuned or suitable for your prompt.
+# Replace "TinyLlama/TinyLlama-1.1B-Chat-v1.0" with the name of a smaller model.
+# Examples (you MUST verify these are chat-tuned and small enough):
+# - "google/gemma-2b-it" (2.5B params - might still be too large, but try quantization)
+# - "microsoft/Phi-3-mini-4k-instruct" (3.8B params - definitely too large for free tier unless heavily quantized)
+# - There aren't many *great* chat models < 1B. You might need to look for fine-tunes of very small base models.
+# - You *could* try a non-chat base model (like a tiny GPT-2) but the prompt template would need drastic changes.
+LLM_MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0" # <--- REPLACE THIS!
+
+# --- END CHANGE THIS LINE ---
+
 
 st.markdown("""
 <style>
@@ -419,27 +431,21 @@ with st.expander("💻 System Configuration", expanded=True): # Start expanded f
         st.session_state.qa_chain = None
         st.session_state.model_loaded = False
         st.session_state.llm_pipeline = None
-        st.session_state.used_device = "Loading..."
+        # Determine the device immediately when button is clicked, based on the checkbox value
+        determined_device_on_click = "cpu"
+        if not st.session_state.force_cpu_checkbox and torch.cuda.is_available():
+            determined_device_on_click = "cuda"
+        st.session_state.used_device = determined_device_on_click # Store the intended device
         st.rerun() # Rerun immediately to show loading state
 
+    # This block runs on the rerun triggered by the button click, or if loading failed and page reloaded
+    # Ensure this block only runs when loading is explicitly in progress
     if st.session_state.loading_in_progress and st.session_state.qa_chain is None:
-        # This block runs on the rerun triggered by the button click
-        with st.spinner(f"Initializing knowledge system on {st.session_state.used_device}..."): # Show spinner during the whole process
+        # Retrieve the intended device from session state
+        determined_device = st.session_state.used_device
+
+        with st.spinner(f"Initializing knowledge system on {determined_device}..."): # Show spinner during the whole process
             try:
-                # Determine the device - respect force_cpu checkbox value from session state
-                determined_device = "cpu"
-                if not st.session_state.force_cpu_checkbox and torch.cuda.is_available():
-                    determined_device = "cuda"
-                    try:
-                         gpu_name = torch.cuda.get_device_name(0)
-                         st.info(f"GPU available: {gpu_name}. Attempting to use CUDA.")
-                    except Exception:
-                         st.info("GPU available. Attempting to use CUDA.")
-                else:
-                    st.info("Loading models on CPU (GPU not available or Force CPU selected).")
-
-                st.session_state.used_device = determined_device # Update session state with the chosen device
-
                 # --- Load Embedding Model Manually ---
                 st.info(f"Loading embedding model '{EMBEDDING_MODEL_NAME}' onto {determined_device}...")
                 try:
@@ -601,9 +607,9 @@ with st.expander("💻 System Configuration", expanded=True): # Start expanded f
                     st.exception(e) # Show traceback for LLM error
                     # Add a more specific OOM check hint if possible
                     if "CUDA out of memory" in str(e) or "hipErrorOutOfMemory" in str(e):
-                         st.error("This looks like a CUDA/GPU Out of Memory error. The model or embeddings might be too large for the available VRAM. Try using the 'Force CPU' option (if you have enough CPU RAM) or running on a machine with more VRAM.")
+                         st.error("This looks like a CUDA/GPU Out of Memory error. The model or embeddings might be too large for the available VRAM. Try using the 'Force CPU' option (if you have enough CPU RAM) or running on a machine with more VRAM). Alternatively, try an even smaller language model.")
                     if "bitsandbytes" in str(e):
-                         st.error("BitsAndBytes error during quantization. Ensure `bitsandbytes` is installed correctly for your CUDA version and GPU.")
+                         st.error("BitsAndBytes error during quantization. Ensure `bitsandbytes` is installed correctly for your CUDA version and GPU, or try a different model/loading method.")
                     raise # Re-raise to fail gracefully
 
 
@@ -636,6 +642,8 @@ Do not reference any previous questions or answers as you have no memory of past
                     chain_type_kwargs={"prompt": QA_PROMPT}
                 )
 
+                # Final confirmation of device used
+                st.session_state.used_device = determined_device
                 st.success("Knowledge system fully initialized and ready!")
 
 
@@ -652,7 +660,8 @@ Do not reference any previous questions or answers as you have no memory of past
             finally:
                  # Always set loading flag to False after the process finishes (success or failure)
                  st.session_state.loading_in_progress = False
-                 st.rerun() # Rerun one last time to update button/status states
+                 # Trigger a rerun to update button state and status indicators immediately
+                 st.rerun()
 
 
 # Create tabs for different sections
@@ -686,7 +695,6 @@ with tab1:
                 try:
                     with st.spinner("Analyzing knowledge base and formulating response..."):
                         # This call returns the full text output including the prompt template parts
-                        # LangChain v0.1.0+ will return {'query': ..., 'result': ..., 'source_documents': ...}
                         response = st.session_state.qa_chain({"query": query})
 
                         # Get the raw output string from the LLM
@@ -710,7 +718,7 @@ with tab1:
                             for pattern in clean_patterns:
                                 cleaned_answer = cleaned_answer.replace(pattern, "").strip()
                             answer = cleaned_answer # Use the cleaned version as fallback
-                            if raw_output != answer:
+                            if raw_output.strip() != answer.strip(): # Only warn if cleaning actually changed something
                                  st.warning("Could not find the exact response format. Attempted to clean output.")
                             # else: raw_output had no obvious prefixes
 
@@ -755,7 +763,7 @@ with tab2:
         <p>This system uses the following technologies:</p>
         <ul>
             <li>Embedding Model: <code>sentence-transformers/all-MiniLM-L6-v2</code></li>
-            <li>Language Model: <code>TinyLlama/TinyLlama-1.1B-Chat-v1.0</code></li>
+            <li>Language Model: <code>TinyLlama/TinyLlama-1.1B-Chat-v1.0</code></li> <!-- Update this line manually in your code -->
             <li>Vector Database: FAISS (Facebook AI Similarity Search)</li>
             <li>Framework: LangChain + Streamlit</li>
         </ul>
@@ -848,13 +856,13 @@ with st.sidebar:
                 # Fallback to torch stats if pynvml is not available but CUDA is
                 try:
                     allocated = torch.cuda.memory_allocated(0)/1024**2
-                    cached = torch.cuda.memory_reserved(0)/1024**2 # Use reserved for better estimate
+                    reserved = torch.cuda.memory_reserved(0)/1024**2 # Use reserved for better estimate
                     st.markdown(f"""
                     <div style="margin-bottom: 15px;">
                         <span style="font-weight: 600; color: #6200EA;">GPU Memory (torch):</span>
                         <div style="margin-top: 8px;">
                             <span>Allocated: {allocated:.2f} MB</span><br>
-                            <span>Reserved: {cached:.2f} MB</span>
+                            <span>Reserved: {reserved:.2f} MB</span>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -891,7 +899,7 @@ with st.sidebar:
     <div style="margin-bottom: 10px;">
         <span style="font-weight: 600; color: #6200EA;">Language Model:</span>
         <div style="background-color: rgba(98, 0, 234, 0.05); padding: 8px; border-radius: 5px; margin-top: 5px; word-break: break-all;">
-            <code>{LLM_MODEL_NAME}</code>
+            <code>{LLM_MODEL_NAME}</code> <!-- This will show the name you set -->
         </div>
     </div>
 
@@ -926,7 +934,7 @@ with st.sidebar:
             <li>Include key terms relevant to your research</li>
             <li>For complex topics, break down into multiple queries</li>
             <li>System works best with focused, clear questions</li>
-             <li>If loading fails, try checking 'Force CPU' in Configuration (may be slow).</li>
+             <li>If loading fails, try checking 'Force CPU' in Configuration (may be slow), or consider using a smaller LLM.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
