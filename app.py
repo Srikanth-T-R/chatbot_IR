@@ -772,6 +772,12 @@ with st.sidebar:
                     <span>Could not retrieve GPU info: {str(gpu_info_e)}</span>
                 </div>
                 """, unsafe_allow_html=True)
+        except Exception as e:
+            st.markdown(f"""
+        <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
+            <span>Could not retrieve GPU details: {str(e)}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
 
     # Models info
