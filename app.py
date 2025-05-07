@@ -7,11 +7,11 @@ from langchain_community.llms import HuggingFacePipeline
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 # Import transformers package and specific components
-import transformers
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+import transformers # Import the package
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig # Import specific classes
 import torch # Keep this import
 # Make sure you have these libraries installed:
-# pip install streamlit langchain langchain-community faiss-cpu transformers torch accelerate bitsandbytes pynvml
+# pip install streamlit langchain langchain-community faiss-cpu transformers torch accelerate bitsandbytes pynvml sentence-transformers
 
 st.set_page_config(
     page_title="IR Knowledge Hub",
@@ -23,7 +23,7 @@ st.set_page_config(
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 LLM_MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 # Specify the path to the FAISS index directory as a constant or get it via text_input
-FAISS_INDEX_PATH = "faiss_index_uploaded_data" # Default path
+FAISS_INDEX_PATH = "faiss_index_uploaded_data" # Default path - Adjust if needed
 
 st.markdown("""
 <style>
@@ -274,27 +274,32 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Cached Functions for Loading Resources ---
+# Using @st.cache_resource to cache heavy resources like models and databases.
+# Arguments must be hashable (strings, numbers, tuples, etc.).
 
 @st.cache_resource
 def load_embedding_model(model_name):
     """Loads the embedding model using st.cache_resource."""
+    st.info(f"⚙️ Loading embedding model: {model_name}...")
     try:
-        st.info(f"⚙️ Loading embedding model: {model_name}...")
+        # HuggingFaceEmbeddings requires sentence-transformers
         embeddings = HuggingFaceEmbeddings(model_name=model_name)
         st.success("✅ Embedding model loaded successfully.")
         return embeddings
+    except ImportError:
+         st.error("❌ Error: `sentence-transformers` library not found.")
+         st.markdown("Please ensure `sentence-transformers` is in your `requirements.txt`.")
+         return None
     except Exception as e:
         st.error(f"❌ Error loading embedding model: {e}")
         st.exception(e)
         return None
 
 @st.cache_resource
-def load_faiss_database(path, embeddings):
+# Modified to accept embedding_model_name (hashable) instead of embeddings object (unhashable)
+def load_faiss_database(path, embedding_model_name):
     """Loads the FAISS database using st.cache_resource."""
-    if embeddings is None:
-        st.error("Embedding model not loaded, cannot load FAISS index.")
-        return None
-    st.info(f"⚙️ Loading FAISS index from: {path}...")
+    st.info(f"⚙️ Loading FAISS index from: {path} using embeddings model: {embedding_model_name}...")
     try:
         if not os.path.exists(path):
              st.error(f"❌ FAISS index directory not found at: {path}")
@@ -303,6 +308,12 @@ def load_faiss_database(path, embeddings):
         if not os.path.exists(os.path.join(path, "index.faiss")) or not os.path.exists(os.path.join(path, "index.pkl")):
              st.error(f"❌ FAISS index files (index.faiss, index.pkl) not found in: {path}")
              st.markdown("Please ensure the FAISS index directory contains `index.faiss` and `index.pkl` files.")
+             return None
+
+        # Get embeddings by calling the cached function - this will be fast if embeddings are already cached
+        embeddings = load_embedding_model(embedding_model_name)
+        if embeddings is None:
+             st.error("Embedding model could not be loaded for FAISS. Please check logs.")
              return None
 
         db = FAISS.load_local(
@@ -319,15 +330,14 @@ def load_faiss_database(path, embeddings):
 
 @st.cache_resource
 def load_llm_and_pipeline(model_name):
-    """Loads the Language Model and Pipeline using st.cache_resource."""
-    st.info(f"⚙️ Loading language model: {model_name} (This may take a few minutes the first time)...")
-    try:
+     """Loads the Language Model and Pipeline using st.cache_resource."""
+     st.info(f"⚙️ Loading language model: {model_name} (This may take a few minutes the first time)...")
+     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         st.info(f"⚙️ Using device for LLM: {device}")
 
         model = None
         tokenizer = None
-        pipe = None
 
         # Configure quantization if CUDA is available
         bnb_config = None
@@ -387,10 +397,11 @@ def load_llm_and_pipeline(model_name):
             else:
                  # Fallback: Add a new pad token
                 tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-                model.resize_token_embeddings(len(tokenizer)) # Resize model embeddings to fit new token
+                # Resize model embeddings if a new token was added
+                model.resize_token_embeddings(len(tokenizer))
                 st.warning("⚠️ Tokenizer missing pad_token and eos_token. Added a new PAD token and resized model embeddings.")
 
-        # Use transformers.pipeline instead of the direct import
+        # Use transformers.pipeline explicitly
         pipe = transformers.pipeline(
             "text-generation",
             model=model,
@@ -407,24 +418,45 @@ def load_llm_and_pipeline(model_name):
         st.success("✅ Text generation pipeline created.")
 
         return pipe # Return the pipeline directly
-    except ImportError:
-        st.error("❌ Error: `bitsandbytes` and/or `accelerate` not installed. These are required for 4-bit quantization for GPU loading.")
-        st.markdown("Please ensure `bitsandbytes` and `accelerate` are in your `requirements.txt`.")
-        return None
-    except Exception as e:
+     except ImportError:
+         st.error("❌ Error: Missing required libraries for quantization (bitsandbytes, accelerate).")
+         st.markdown("Please ensure `bitsandbytes` and `accelerate` are in your `requirements.txt` for GPU loading.")
+         return None
+     except Exception as e:
         st.error(f"❌ Error loading Language Model or creating pipeline: {e}")
         st.exception(e)
         return None
 
 @st.cache_resource
-def create_retrieval_qa_chain(llm_pipeline, db_retriever):
+# Modified to accept input identifiers (names, paths)
+def create_retrieval_qa_chain(llm_model_name, faiss_index_path, embedding_model_name):
     """Creates the RetrievalQA chain using st.cache_resource."""
-    if llm_pipeline is None or db_retriever is None:
-        st.error("LLM Pipeline or Retriever not available, cannot create QA chain.")
-        return None
     st.info("⚙️ Creating Retrieval QA chain...")
     try:
+        # Get required components by calling other cached functions
+        llm_pipeline = load_llm_and_pipeline(llm_model_name)
+        if llm_pipeline is None:
+            st.error("LLM Pipeline not loaded, cannot create QA chain.")
+            return None
+
+        db = load_faiss_database(faiss_index_path, embedding_model_name)
+        if db is None:
+            st.error("FAISS database not loaded, cannot create QA chain.")
+            return None
+
         llm = HuggingFacePipeline(pipeline=llm_pipeline)
+
+        # Set up retriever
+        retriever = db.as_retriever(
+           search_type="mmr", # Use MMR as specified
+           search_kwargs={
+               "k": 3,
+               "fetch_k": 6,
+               "lambda_mult": 0.7,
+           }
+        )
+        st.success("✅ Document retriever configured.")
+
 
         # Define QA prompt (Keep your existing prompt)
         qa_prompt_template = """### System:
@@ -449,9 +481,9 @@ Do not reference any previous questions or answers as you have no memory of past
         # Create QA chain
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
-            chain_type="stuff", # 'stuff' is simplest, puts all context into one prompt
-            retriever=db_retriever,
-            return_source_documents=False, # As per original request
+            chain_type="stuff",
+            retriever=retriever,
+            return_source_documents=False,
             chain_type_kwargs={"prompt": QA_PROMPT}
         )
         st.success("✅ Retrieval QA chain created.")
@@ -460,6 +492,7 @@ Do not reference any previous questions or answers as you have no memory of past
         st.error(f"❌ Error creating Retrieval QA chain: {e}")
         st.exception(e)
         return None
+
 
 # --- Streamlit App Structure ---
 
@@ -520,59 +553,21 @@ with st.expander("💻 System Configuration", expanded=False):
     # Loading logic triggered by the button
     if load_system_button:
          # Clear previous chain/status to show loading animation accurately
-         # Note: The cached resources themselves are NOT cleared, just the state variables
-         st.session_state.qa_chain = None
-         st.session_state.model_loaded = False # Reset model_loaded state
-         st.session_state.llm_pipeline = None # Clear previous pipeline state
+         # Note: The cached resources themselves are NOT cleared by this, only session state
+         st.session_state.qa_chain = None # Clear the chain to indicate loading is in progress
 
          with st.spinner("Initializing knowledge system (this may take a few minutes the first time)..."):
-             # Call the cached functions sequentially
-             embeddings = load_embedding_model(EMBEDDING_MODEL_NAME)
-             if embeddings:
-                # Use the value from the text input for loading the index
-                db = load_faiss_database(faiss_index_path_input, embeddings)
-                if db:
-                     # Set up retriever
-                     retriever = db.as_retriever(
-                        search_type="mmr", # Use MMR as specified
-                        search_kwargs={
-                            "k": 3,
-                            "fetch_k": 6,
-                            "lambda_mult": 0.7,
-                        }
-                     )
-                     st.success("✅ Document retriever configured.")
+             # Call the main cached function to create the chain
+             # Pass identifiers (strings) which are hashable
+             qa_chain = create_retrieval_qa_chain(LLM_MODEL_NAME, faiss_index_path_input, EMBEDDING_MODEL_NAME)
 
-                     # Load LLM and pipeline
-                     llm_pipeline = load_llm_and_pipeline(LLM_MODEL_NAME)
-                     if llm_pipeline:
-                         st.session_state.llm_pipeline = llm_pipeline # Store pipeline if needed elsewhere
-                         st.session_state.model_loaded = True # Indicate model is loaded
+             # Store the resulting chain (or None) in session state
+             st.session_state.qa_chain = qa_chain
 
-                         # Create the QA chain
-                         qa_chain = create_retrieval_qa_chain(llm_pipeline, retriever)
-                         if qa_chain:
-                             st.session_state.qa_chain = qa_chain # Store the final chain
-                             st.success("✨ System fully initialized and ready!")
-                         else:
-                            st.error("❌ Failed to create QA chain.")
-                            # Reset states if chain creation failed
-                            st.session_state.qa_chain = None
-                            st.session_state.model_loaded = False
-                            st.session_state.llm_pipeline = None
-
-                else:
-                    st.error("❌ Failed to load FAISS database.")
-                    # Reset states if FAISS failed
-                    st.session_state.qa_chain = None
-                    st.session_state.model_loaded = False
-                    st.session_state.llm_pipeline = None
+             if st.session_state.qa_chain is not None:
+                 st.success("✨ System fully initialized and ready!")
              else:
-                 st.error("❌ Failed to load embedding model.")
-                 # Reset states if embeddings failed
-                 st.session_state.qa_chain = None
-                 st.session_state.model_loaded = False
-                 st.session_state.llm_pipeline = None
+                 st.error("❌ System initialization failed.") # Error message comes from cached functions
 
 
 # Create tabs for different sections
@@ -629,6 +624,7 @@ with tab1:
                                 answer = raw_output[prefix_index + len(answer_prefix):].lstrip()
                             else:
                                 # Fallback: If the prefix isn't found (e.g., model didn't follow format)
+                                # This shouldn't happen with a good prompt template and LLM but is a safeguard
                                 st.warning("Could not find the expected response format in the output. Displaying raw output.")
                                 answer = raw_output.strip() # Still strip leading/trailing whitespace
                             # --- END: Logic to extract only the content after "### Assistant:" ---
@@ -696,7 +692,7 @@ with st.sidebar:
     # Create a stylized info card for system status
     st.markdown("""
     <div style="background-color: #FFFFFF; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-    """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True) # <-- This div starts the main info card
 
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -712,9 +708,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Start of the corrected GPU info block ---
+    # --- Start of the corrected GPU info block structure ---
     if device == "cuda" and torch.cuda.is_available():
-        try: # This try is specifically for getting the GPU name and handling errors during that
+        try: # Try getting GPU name first
             gpu_name = torch.cuda.get_device_name(0)
             st.markdown(f"""
             <div style="margin-bottom: 15px;">
@@ -722,7 +718,7 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
 
-            # Check if pynvml is available for better memory stats
+            # Now, try getting detailed memory info using nested try blocks
             try: # This try is specifically for pynvml
                 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlShutdown
                 nvmlInit()
@@ -745,8 +741,8 @@ with st.sidebar:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-                nvmlShutdown()
-            except ImportError: # Catch pynvml import error here
+                nvmlShutdown() # Remember to shut down NVML
+            except ImportError: # pynvml not installed - this is the intended path if pynvml isn't in requirements
                 st.markdown("""
                 <div style="margin-bottom: 15px; font-size: 0.9rem; color: #FF6D00;">
                     <i>Install pynvml (`pip install pynvml`) for detailed GPU memory statistics</i>
@@ -766,13 +762,7 @@ with st.sidebar:
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
-                    else:
-                         # This else handles the case where CUDA was initially available but failed later (unlikely but safe)
-                         st.markdown("""
-                        <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
-                            <span>CUDA not available for torch memory info.</span>
-                        </div>
-                        """, unsafe_allow_html=True)
+                    # No else needed here, as the outer if checks cuda availability
                 except Exception as torch_mem_e: # Catch errors during torch memory retrieval
                      st.markdown(f"""
                         <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
@@ -780,20 +770,22 @@ with st.sidebar:
                         </div>
                         """, unsafe_allow_html=True)
             except Exception as pynvml_other_e: # Catch other errors specifically within the pynvml block
+                 # This catches errors *after* pynvml is imported but before shutdown
                  st.markdown(f"""
                     <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
-                        <span>Error getting detailed GPU info: {str(pynvml_other_e)}</span>
+                        <span>Error during NVML memory retrieval: {str(pynvml_other_e)}</span>
                     </div>
                     """, unsafe_allow_html=True)
 
-        except Exception as gpu_name_e: # Catch errors specifically while getting GPU name
+        except Exception as gpu_info_e: # Catch error if getting GPU name fails or other initial GPU checks fail
             st.markdown(f"""
             <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
-                <span>Could not retrieve GPU name: {str(gpu_name_e)}</span>
+                <span>Could not retrieve basic GPU info: {str(gpu_info_e)}</span>
             </div>
             """, unsafe_allow_html=True)
 
-    # --- End of the corrected GPU info block ---
+    # --- End of the corrected GPU info block structure ---
+
 
     # Models info
     st.markdown("""
