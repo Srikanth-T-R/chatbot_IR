@@ -9,11 +9,30 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
 
+# Constants
 FAISS_SAVE_PATH = "faiss_index_uploaded_data"
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 GEMINI_MODEL_NAME = "models/gemini-1.5-flash-latest"
 GOOGLE_API_KEY = "AIzaSyBkjbOBbc8XpWGNN8lStFCnIbu3MO9vhug"
 
+# Set page configuration
+st.set_page_config(page_title="The Diplomat", layout="wide")
+
+# Hide Streamlit menu and footer
+hide_menu_style = """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        </style>
+        """
+st.markdown(hide_menu_style, unsafe_allow_html=True)
+
+# Main app title
+st.title("The Diplomat Chatbot")
+st.markdown("Ask questions about the documents mentioned, The system will retrieve relevant context and give you an answer.")
+
+# API key validation
 if not GOOGLE_API_KEY or GOOGLE_API_KEY == "YOUR_ACTUAL_GOOGLE_API_KEY_HERE":
     st.error("🚨 GOOGLE_API_KEY not found or is still the placeholder. Please replace 'YOUR_ACTUAL_GOOGLE_API_KEY_HERE' with your actual key in the code.")
     st.warning("Reminder: Hardcoding API keys is a security risk. Consider using Streamlit secrets or environment variables for better security.")
@@ -100,15 +119,13 @@ def get_rag_chain(_retriever, _llm):
     )
     return rag_chain
 
-st.set_page_config(page_title="The Diplomat ", layout="wide")
-st.title("The Diplomat Chatbot")
-st.markdown("Ask questions about the documents mentioned, The system will retrieve relevant context and give you an answer.")
-
+# Device detection for GPU/CPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
 if device == "cuda":
     st.sidebar.success(f"Using GPU: {torch.cuda.get_device_name(0)}")
     torch.cuda.empty_cache()
 
+# Load models and create RAG chain
 embeddings_model = load_embeddings_model(EMBEDDING_MODEL_NAME, device)
 retriever = load_faiss_index(FAISS_SAVE_PATH, embeddings_model)
 llm = load_llm(GEMINI_MODEL_NAME, GOOGLE_API_KEY)
@@ -119,13 +136,16 @@ else:
     st.error("🚨 RAG chain could not be initialized due to previous errors.")
     st.stop()
 
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# Chat input and response
 if query := st.chat_input("What is your question?"):
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
@@ -147,6 +167,7 @@ if query := st.chat_input("What is your question?"):
 
     st.session_state.messages.append({"role": "assistant", "content": full_response})
 
+# Sidebar content
 st.sidebar.markdown("---")
 st.sidebar.subheader("About")
 st.sidebar.info(
