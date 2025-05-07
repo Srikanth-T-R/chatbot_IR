@@ -29,7 +29,7 @@ hide_menu_style = """
 st.markdown(hide_menu_style, unsafe_allow_html=True)
 
 # Main app title
-st.title("The Diplomat Chatbot")
+st.title("Chatbot for International Relations")
 st.markdown("Ask questions about the documents mentioned, The system will retrieve relevant context and give you an answer.")
 
 # API key validation
