@@ -1,12 +1,9 @@
 streamlit
+langchain
 langchain-community
-sentence-transformers
+faiss-cpu # Or faiss-gpu if you have a GPU enabled environment, but faiss-cpu is often sufficient for loading.
 transformers
-torch # Streamlit Community Cloud will usually install the correct CPU/CUDA version based on their infra
-# You might need a specific torch version if there are compatibility issues, e.g. torch==2.2.0+cu121
-# Check Streamlit Cloud docs or experiment.
-faiss-cpu # If you built the index on CPU
-# OR faiss-gpu if you need GPU acceleration for FAISS search itself (less common for embeddings)
-bitsandbytes # Necessary for 4-bit quantization on GPU
-accelerate # Often necessary for quantization and device_map="auto"
-pynvml # Optional, for detailed GPU memory info in sidebar
+torch
+accelerate
+bitsandbytes
+pynvml # Optional, for detailed GPU stats in sidebar
