@@ -6,7 +6,9 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.llms import HuggingFacePipeline
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+# Import transformers package and specific components
+import transformers
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch # Keep this import
 # Make sure you have these libraries installed:
 # pip install streamlit langchain langchain-community faiss-cpu transformers torch accelerate bitsandbytes pynvml
@@ -277,6 +279,7 @@ st.markdown("""
 def load_embedding_model(model_name):
     """Loads the embedding model using st.cache_resource."""
     try:
+        st.info(f"⚙️ Loading embedding model: {model_name}...")
         embeddings = HuggingFaceEmbeddings(model_name=model_name)
         st.success("✅ Embedding model loaded successfully.")
         return embeddings
@@ -291,6 +294,7 @@ def load_faiss_database(path, embeddings):
     if embeddings is None:
         st.error("Embedding model not loaded, cannot load FAISS index.")
         return None
+    st.info(f"⚙️ Loading FAISS index from: {path}...")
     try:
         if not os.path.exists(path):
              st.error(f"❌ FAISS index directory not found at: {path}")
@@ -298,6 +302,7 @@ def load_faiss_database(path, embeddings):
         # Check for required files
         if not os.path.exists(os.path.join(path, "index.faiss")) or not os.path.exists(os.path.join(path, "index.pkl")):
              st.error(f"❌ FAISS index files (index.faiss, index.pkl) not found in: {path}")
+             st.markdown("Please ensure the FAISS index directory contains `index.faiss` and `index.pkl` files.")
              return None
 
         db = FAISS.load_local(
@@ -315,9 +320,10 @@ def load_faiss_database(path, embeddings):
 @st.cache_resource
 def load_llm_and_pipeline(model_name):
     """Loads the Language Model and Pipeline using st.cache_resource."""
+    st.info(f"⚙️ Loading language model: {model_name} (This may take a few minutes the first time)...")
     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        st.info(f"⚙️ Using device: {device}")
+        st.info(f"⚙️ Using device for LLM: {device}")
 
         model = None
         tokenizer = None
@@ -362,12 +368,14 @@ def load_llm_and_pipeline(model_name):
         else:
              st.warning("⚠️ BitsAndBytes quantization not applied. Loading model without quantization (might require more memory).")
              # Load without quantization, explicitly moving to device
+             # Check if CUDA is available and use it, otherwise fallback to CPU
+             target_device = "cuda" if torch.cuda.is_available() else "cpu"
              model = AutoModelForCausalLM.from_pretrained(
                  model_name,
                  trust_remote_code=False,
-             ).to(device) # Move to CUDA or CPU
+             ).to(target_device) # Move to CUDA or CPU
 
-             st.success("✅ Language model loaded in full precision.")
+             st.success(f"✅ Language model loaded in full precision on {target_device}.")
 
 
         tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -382,7 +390,8 @@ def load_llm_and_pipeline(model_name):
                 model.resize_token_embeddings(len(tokenizer)) # Resize model embeddings to fit new token
                 st.warning("⚠️ Tokenizer missing pad_token and eos_token. Added a new PAD token and resized model embeddings.")
 
-        pipe = pipeline(
+        # Use transformers.pipeline instead of the direct import
+        pipe = transformers.pipeline(
             "text-generation",
             model=model,
             tokenizer=tokenizer,
@@ -413,7 +422,7 @@ def create_retrieval_qa_chain(llm_pipeline, db_retriever):
     if llm_pipeline is None or db_retriever is None:
         st.error("LLM Pipeline or Retriever not available, cannot create QA chain.")
         return None
-
+    st.info("⚙️ Creating Retrieval QA chain...")
     try:
         llm = HuggingFacePipeline(pipeline=llm_pipeline)
 
@@ -513,8 +522,8 @@ with st.expander("💻 System Configuration", expanded=False):
          # Clear previous chain/status to show loading animation accurately
          # Note: The cached resources themselves are NOT cleared, just the state variables
          st.session_state.qa_chain = None
-         st.session_state.model_loaded = False
-         st.session_state.llm_pipeline = None # Clear previous states
+         st.session_state.model_loaded = False # Reset model_loaded state
+         st.session_state.llm_pipeline = None # Clear previous pipeline state
 
          with st.spinner("Initializing knowledge system (this may take a few minutes the first time)..."):
              # Call the cached functions
@@ -589,7 +598,8 @@ with tab1:
 
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            generate_button = st.button("Generate Response", use_container_width=True)
+            # Only enable the button if the system is ready
+            generate_button = st.button("Generate Response", use_container_width=True, disabled=st.session_state.get('qa_chain') is None)
 
         if generate_button:
             if query:
@@ -615,7 +625,8 @@ with tab1:
 
                             if prefix_index != -1:
                                 # The actual answer starts right after the prefix and potential newline/space
-                                answer = raw_output[prefix_index + len(answer_prefix):].lstrip() # Use lstrip to remove leading whitespace/newlines
+                                # Use lstrip to remove leading whitespace/newlines from the answer
+                                answer = raw_output[prefix_index + len(answer_prefix):].lstrip()
                             else:
                                 # Fallback: If the prefix isn't found (e.g., model didn't follow format)
                                 st.warning("Could not find the expected response format in the output. Displaying raw output.")
@@ -627,6 +638,7 @@ with tab1:
                             # Ensure the answer is treated as markdown potentially within the styled box
                             st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
                         else:
+                             # This case should ideally not be reached if the button is disabled when not ready
                              st.error("System is not initialized. Please click 'Load System' above.")
 
 
@@ -772,12 +784,6 @@ with st.sidebar:
                     <span>Could not retrieve GPU info: {str(gpu_info_e)}</span>
                 </div>
                 """, unsafe_allow_html=True)
-        except Exception as e:
-            st.markdown(f"""
-        <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
-            <span>Could not retrieve GPU details: {str(e)}</span>
-        </div>
-        """, unsafe_allow_html=True)
 
 
     # Models info
@@ -825,7 +831,8 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # <<< --- CORRECTED LINE POSITION --- >>>
-    st.markdown("</div>", unsafe_allow_html=True) # Close the main sidebar info card div
+    # Close the main sidebar info card div before the quick tips
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # Help section (now correctly outside the main info card div)
     st.markdown("""
