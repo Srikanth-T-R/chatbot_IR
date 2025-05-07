@@ -130,9 +130,9 @@ def get_rag_chain(_retriever, _llm):
     return rag_chain
 
 # --- 4. Streamlit App UI and Logic ---
-st.set_page_config(page_title="📄 RAG Q&A with Gemini", layout="wide")
-st.title("📄 Retrieval Augmented Generation (RAG) Q&A")
-st.markdown("Ask questions about your vectorized data. The system will retrieve relevant context and use Gemini to generate an answer.")
+st.set_page_config(page_title="The Diplomat Chatbot", layout="wide")
+st.title("The Diplomat Chatbot")
+st.markdown("Ask questions about the documents mentioned, The system will retrieve relevant context and give you an answer.")
 
 # Check device
 device = "cuda" if torch.cuda.is_available() else "cpu"
