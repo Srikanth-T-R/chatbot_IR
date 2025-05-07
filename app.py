@@ -8,7 +8,6 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch # Keep this import
-import sentence_transformers # Import sentence_transformers explicitly
 
 
 st.set_page_config(
@@ -321,20 +320,8 @@ with st.expander("💻 System Configuration", expanded=False):
         else:
             with st.spinner("Initializing knowledge system..."):
                 try:
-                    # Load embeddings with device handling
-                    device = "cuda" if torch.cuda.is_available() else "cpu"
-                    st.info(f"Using device for embeddings: {device}")
-                    
-                    # Fix for the meta tensor issue - Create embeddings with explicit device handling
-                    model_kwargs = {'device': device}
-                    encode_kwargs = {'normalize_embeddings': True}
-                    
-                    # Initialize embeddings with proper device handling
-                    embeddings = HuggingFaceEmbeddings(
-                        model_name=EMBEDDING_MODEL_NAME,
-                        model_kwargs=model_kwargs,
-                        encode_kwargs=encode_kwargs
-                    )
+                    # Load embeddings
+                    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
                     st.success("Embedding model loaded successfully.")
 
                     # Load existing FAISS index
@@ -360,7 +347,7 @@ with st.expander("💻 System Configuration", expanded=False):
                     if not st.session_state.model_loaded:
                         with st.spinner("Loading language model (this may take a few minutes)..."):
                             device = "cuda" if torch.cuda.is_available() else "cpu"
-                            st.info(f"Using device for LLM: {device}")
+                            st.info(f"Using device: {device}")
 
                             # Check if GPU is available and handle bfloat16 if not
                             bnb_config = None # Default to no quantization
@@ -679,4 +666,59 @@ with st.sidebar:
     </div>
     
     <div style="margin-bottom: 10px;">
-        <span style="font-weight:
+        <span style="font-weight: 600; color: #6200EA;">Language Model:</span>
+        <div style="background-color: rgba(98, 0, 234, 0.05); padding: 8px; border-radius: 5px; margin-top: 5px;">
+            <code>{LLM_MODEL_NAME}</code>
+        </div>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+        <span style="font-weight: 600; color: #6200EA;">FAISS Index:</span>
+        <div style="background-color: rgba(98, 0, 234, 0.05); padding: 8px; border-radius: 5px; margin-top: 5px; 
+                   overflow-wrap: break-word; word-wrap: break-word;">
+            <code>{faiss_index_path}</code>
+        </div>
+    </div>
+    
+    <div style="margin-top: 25px; margin-bottom: 15px;">
+        <span style="font-weight: 600; color: #6200EA; font-size: 1.1rem;">System Status</span>
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+        <span style="font-weight: 600; color: #6200EA;">Ready Status:</span> 
+        <span style="background-color: {'rgba(0, 200, 83, 0.1)' if st.session_state.qa_chain else 'rgba(255, 214, 0, 0.1)'}; 
+               padding: 3px 10px; border-radius: 50px; font-size: 0.9rem; 
+               color: {'#00C853' if st.session_state.qa_chain else '#FF6D00'};">
+            {'✅ Ready' if st.session_state.qa_chain else '⏳ Waiting'}
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Help section
+    st.markdown("""
+    <div style="margin-top: 30px; background-color: #E1F5FE; padding: 20px; border-radius: 10px;">
+        <h3 style="color: #0277BD; margin-top: 0;">Quick Tips</h3>
+        <ul style="padding-left: 20px; margin-bottom: 0;">
+            <li>Ask specific questions for more accurate answers</li>
+            <li>Include key terms relevant to your research</li>
+            <li>For complex topics, break down into multiple queries</li>
+            <li>System works best with focused, clear questions</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- Footer ---
+st.markdown("---")
+st.markdown("""
+<div class="footer">
+    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+        <div style="font-size: 24px; margin-right: 10px;">🔍</div>
+        <div style="font-weight: 600; font-size: 1.2rem; background: linear-gradient(90deg, #6200EA, #00BFA5); 
+                   -webkit-background-clip: text; background-clip: text; color: transparent;">
+            IR Knowledge Hub
+        </div>
+    </div>
+    <p style="color: #666; font-size: 0.9rem;">Built with Streamlit, LangChain, Hugging Face, and FAISS</p>
+    <p style="color: #666; font-size: 0.8rem;">© 2025 | International Relations Research Assistant</p>
+</div>
+""", unsafe_allow_html=True)
