@@ -408,8 +408,8 @@ def load_llm_and_pipeline(model_name):
 
         return pipe # Return the pipeline directly
     except ImportError:
-        st.error("❌ Error: `bitsandbytes` and/or `accelerate` not installed. These are required for 4-bit quantization.")
-        st.markdown("Please install required libraries: `pip install bitsandbytes accelerate`")
+        st.error("❌ Error: `bitsandbytes` and/or `accelerate` not installed. These are required for 4-bit quantization for GPU loading.")
+        st.markdown("Please ensure `bitsandbytes` and `accelerate` are in your `requirements.txt`.")
         return None
     except Exception as e:
         st.error(f"❌ Error loading Language Model or creating pipeline: {e}")
@@ -526,7 +526,7 @@ with st.expander("💻 System Configuration", expanded=False):
          st.session_state.llm_pipeline = None # Clear previous pipeline state
 
          with st.spinner("Initializing knowledge system (this may take a few minutes the first time)..."):
-             # Call the cached functions
+             # Call the cached functions sequentially
              embeddings = load_embedding_model(EMBEDDING_MODEL_NAME)
              if embeddings:
                 # Use the value from the text input for loading the index
@@ -696,7 +696,7 @@ with st.sidebar:
     # Create a stylized info card for system status
     st.markdown("""
     <div style="background-color: #FFFFFF; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-    """, unsafe_allow_html=True) # <-- This div starts the main info card
+    """, unsafe_allow_html=True)
 
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -712,8 +712,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # --- Start of the corrected GPU info block ---
     if device == "cuda" and torch.cuda.is_available():
-        try:
+        try: # This try is specifically for getting the GPU name and handling errors during that
             gpu_name = torch.cuda.get_device_name(0)
             st.markdown(f"""
             <div style="margin-bottom: 15px;">
@@ -722,7 +723,7 @@ with st.sidebar:
             """, unsafe_allow_html=True)
 
             # Check if pynvml is available for better memory stats
-            try:
+            try: # This try is specifically for pynvml
                 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlShutdown
                 nvmlInit()
                 handle = nvmlDeviceGetHandleByIndex(0)
@@ -745,16 +746,15 @@ with st.sidebar:
                 </div>
                 """, unsafe_allow_html=True)
                 nvmlShutdown()
-            except ImportError:
+            except ImportError: # Catch pynvml import error here
                 st.markdown("""
                 <div style="margin-bottom: 15px; font-size: 0.9rem; color: #FF6D00;">
                     <i>Install pynvml (`pip install pynvml`) for detailed GPU memory statistics</i>
                 </div>
                 """, unsafe_allow_html=True)
-                # Fallback to torch stats
-                try:
-                    # Wrap torch calls in a check to avoid errors if CUDA isn't actually working
-                    if torch.cuda.is_available():
+                # Fallback to torch stats if pynvml isn't available
+                try: # This try is specifically for torch memory stats
+                    if torch.cuda.is_available(): # Redundant check here, but safe
                         allocated = torch.cuda.memory_allocated(0)/1024**2
                         cached = torch.cuda.memory_cached(0)/1024**2
                         st.markdown(f"""
@@ -767,24 +767,33 @@ with st.sidebar:
                         </div>
                         """, unsafe_allow_html=True)
                     else:
+                         # This else handles the case where CUDA was initially available but failed later (unlikely but safe)
                          st.markdown("""
                         <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
                             <span>CUDA not available for torch memory info.</span>
                         </div>
                         """, unsafe_allow_html=True)
-                except Exception as torch_mem_e:
+                except Exception as torch_mem_e: # Catch errors during torch memory retrieval
                      st.markdown(f"""
                         <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
                             <span>Could not retrieve torch GPU memory info: {str(torch_mem_e)}</span>
                         </div>
                         """, unsafe_allow_html=True)
-            except Exception as gpu_info_e:
-                st.markdown(f"""
-                <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
-                    <span>Could not retrieve GPU info: {str(gpu_info_e)}</span>
-                </div>
-                """, unsafe_allow_html=True)
+            except Exception as pynvml_other_e: # Catch other errors specifically within the pynvml block
+                 st.markdown(f"""
+                    <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
+                        <span>Error getting detailed GPU info: {str(pynvml_other_e)}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
 
+        except Exception as gpu_name_e: # Catch errors specifically while getting GPU name
+            st.markdown(f"""
+            <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
+                <span>Could not retrieve GPU name: {str(gpu_name_e)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # --- End of the corrected GPU info block ---
 
     # Models info
     st.markdown("""
@@ -830,7 +839,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # <<< --- CORRECTED LINE POSITION --- >>>
     # Close the main sidebar info card div before the quick tips
     st.markdown("</div>", unsafe_allow_html=True)
 
