@@ -6,10 +6,10 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.llms import HuggingFacePipeline
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig # Make sure BitsAndBytesConfig is imported
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch # Keep this import
 # Make sure you have these libraries installed:
-# pip install streamlit langchain langchain-community faiss-cpu transformers torch accelerate bitsandbytes
+# pip install streamlit langchain langchain-community faiss-cpu transformers torch accelerate bitsandbytes pynvml
 
 st.set_page_config(
     page_title="IR Knowledge Hub",
@@ -295,12 +295,17 @@ def load_faiss_database(path, embeddings):
         if not os.path.exists(path):
              st.error(f"❌ FAISS index directory not found at: {path}")
              return None
+        # Check for required files
+        if not os.path.exists(os.path.join(path, "index.faiss")) or not os.path.exists(os.path.join(path, "index.pkl")):
+             st.error(f"❌ FAISS index files (index.faiss, index.pkl) not found in: {path}")
+             return None
+
         db = FAISS.load_local(
             path,
             embeddings,
             allow_dangerous_deserialization=True # Required for loading pickle files
         )
-        st.success(f"✅ Successfully loaded FAISS index from `{path}`.")
+        st.success(f"✅ Successfully loaded FAISS index from `{path}`")
         return db
     except Exception as e:
         st.error(f"❌ Error loading FAISS index from `{path}`: {e}")
@@ -491,6 +496,7 @@ with st.expander("💻 System Configuration", expanded=False):
     """, unsafe_allow_html=True)
 
     # Path to the FAISS index directory
+    # Keep the path input, but the cached functions will load based on its value
     faiss_index_path_input = st.text_input(
         "FAISS Index Directory Path:",
         value=FAISS_INDEX_PATH, # Use the default constant
@@ -504,7 +510,8 @@ with st.expander("💻 System Configuration", expanded=False):
 
     # Loading logic triggered by the button
     if load_system_button:
-         # Clear previous chain/status to show loading
+         # Clear previous chain/status to show loading animation accurately
+         # Note: The cached resources themselves are NOT cleared, just the state variables
          st.session_state.qa_chain = None
          st.session_state.model_loaded = False
          st.session_state.llm_pipeline = None # Clear previous states
@@ -513,6 +520,7 @@ with st.expander("💻 System Configuration", expanded=False):
              # Call the cached functions
              embeddings = load_embedding_model(EMBEDDING_MODEL_NAME)
              if embeddings:
+                # Use the value from the text input for loading the index
                 db = load_faiss_database(faiss_index_path_input, embeddings)
                 if db:
                      # Set up retriever
@@ -546,8 +554,16 @@ with st.expander("💻 System Configuration", expanded=False):
 
                 else:
                     st.error("❌ Failed to load FAISS database.")
+                    # Reset states if FAISS failed
+                    st.session_state.qa_chain = None
+                    st.session_state.model_loaded = False
+                    st.session_state.llm_pipeline = None
              else:
                  st.error("❌ Failed to load embedding model.")
+                 # Reset states if embeddings failed
+                 st.session_state.qa_chain = None
+                 st.session_state.model_loaded = False
+                 st.session_state.llm_pipeline = None
 
 
 # Create tabs for different sections
@@ -589,15 +605,17 @@ with tab1:
                             raw_output = response.get('result', '')
 
                             # --- START: Logic to extract only the content after "### Assistant:" ---
+                            # Ensure the prefix matches exactly what the template uses
                             answer_prefix = "### Assistant:"
                             answer = raw_output # Default to full output if prefix isn't found
 
                             # Find the index where the assistant's response is supposed to start
+                            # Add 1 to the end to account for the newline after the colon
                             prefix_index = raw_output.find(answer_prefix)
 
                             if prefix_index != -1:
-                                # The actual answer starts right after the prefix
-                                answer = raw_output[prefix_index + len(answer_prefix):].strip()
+                                # The actual answer starts right after the prefix and potential newline/space
+                                answer = raw_output[prefix_index + len(answer_prefix):].lstrip() # Use lstrip to remove leading whitespace/newlines
                             else:
                                 # Fallback: If the prefix isn't found (e.g., model didn't follow format)
                                 st.warning("Could not find the expected response format in the output. Displaying raw output.")
@@ -666,7 +684,8 @@ with st.sidebar:
     # Create a stylized info card for system status
     st.markdown("""
     <div style="background-color: #FFFFFF; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-    """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True) # <-- This div starts the main info card
+
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     device_icon = "⚡" if device == "cuda" else "💻"
@@ -722,17 +741,25 @@ with st.sidebar:
                 """, unsafe_allow_html=True)
                 # Fallback to torch stats
                 try:
-                    allocated = torch.cuda.memory_allocated(0)/1024**2
-                    cached = torch.cuda.memory_cached(0)/1024**2
-                    st.markdown(f"""
-                    <div style="margin-bottom: 15px;">
-                        <span style="font-weight: 600; color: var(--primary-color);">GPU Memory (torch):</span>
-                        <div style="margin-top: 8px;">
-                            <span>Allocated: {allocated:.2f} MB</span><br>
-                            <span>Cached: {cached:.2f} MB</span>
+                    # Wrap torch calls in a check to avoid errors if CUDA isn't actually working
+                    if torch.cuda.is_available():
+                        allocated = torch.cuda.memory_allocated(0)/1024**2
+                        cached = torch.cuda.memory_cached(0)/1024**2
+                        st.markdown(f"""
+                        <div style="margin-bottom: 15px;">
+                            <span style="font-weight: 600; color: var(--primary-color);">GPU Memory (torch):</span>
+                            <div style="margin-top: 8px;">
+                                <span>Allocated: {allocated:.2f} MB</span><br>
+                                <span>Cached: {cached:.2f} MB</span>
+                            </div>
                         </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
+                    else:
+                         st.markdown("""
+                        <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
+                            <span>CUDA not available for torch memory info.</span>
+                        </div>
+                        """, unsafe_allow_html=True)
                 except Exception as torch_mem_e:
                      st.markdown(f"""
                         <div style="margin-bottom: 15px; color: #D50000; font-size: 0.9rem;">
@@ -791,7 +818,10 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Help section
+    # <<< --- CORRECTED LINE POSITION --- >>>
+    st.markdown("</div>", unsafe_allow_html=True) # Close the main sidebar info card div
+
+    # Help section (now correctly outside the main info card div)
     st.markdown("""
     <div style="margin-top: 30px; background-color: #E1F5FE; padding: 20px; border-radius: 10px;">
         <h3 style="color: #0277BD; margin-top: 0;">Quick Tips</h3>
@@ -803,7 +833,6 @@ with st.sidebar:
         </ul>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True) # Close the sidebar info card div
 
 
 # --- Footer ---
