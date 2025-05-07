@@ -140,6 +140,7 @@ if device == "cuda":
     st.sidebar.success(f"Using GPU: {torch.cuda.get_device_name(0)}")
     torch.cuda.empty_cache()
 else:
+    pass
     # st.sidebar.info("Using CPU. For faster processing, a GPU is recommended.")
 
 # Load models and index
