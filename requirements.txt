@@ -1,8 +1,10 @@
 # requirements.txt
 streamlit
 langchain
+langchain-core # Often a good idea to include explicitly
+langchain-community # Add this line
 langchain-google-genai
-google-generativeai  # Add this line if not already present
+google-generativeai
 sentence-transformers
 faiss-cpu
 torch
