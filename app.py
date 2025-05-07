@@ -8,7 +8,7 @@ from langchain_community.vectorstores import FAISS
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
-from dotenv import load_dotenv # For loading .env file if you use that method
+# from dotenv import load_dotenv # No longer needed if hardcoding
 
 # --- 0. Configuration & Constants ---
 FAISS_SAVE_PATH = "faiss_index_uploaded_data"  # Make sure this path is correct
@@ -16,20 +16,21 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 GEMINI_MODEL_NAME = "models/gemini-1.5-flash-latest" # or "gemini-pro" if preferred
 
 # --- 1. Load API Key ---
-# Try Streamlit secrets first, then environment variables (e.g., from .env)
-# This allows flexibility for local dev and deployment.
-load_dotenv() # Load environment variables from .env if present
+# !!! WARNING: HARDCODING API KEYS IS A SECURITY RISK !!!
+# !!! Only do this for quick, local, temporary testing. !!!
+# !!! DO NOT commit this to version control or share it. !!!
+GOOGLE_API_KEY = "YOUR_ACTUAL_GOOGLE_API_KEY_HERE" # <--- PASTE YOUR KEY HERE
 
-# Option 1: Using Streamlit Secrets (preferred for deployment)
-# GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY")
-
-# Option 2: Using Environment Variables (good for local dev or other deployments)
-# If GOOGLE_API_KEY is not in st.secrets, try os.environ
+# Remove or comment out the previous API key loading logic:
+# load_dotenv()
+# GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 # if not GOOGLE_API_KEY:
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+#     GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY")
 
-if not GOOGLE_API_KEY:
-    st.error("🚨 GOOGLE_API_KEY not found. Please set it in Streamlit secrets or as an environment variable.")
+
+if not GOOGLE_API_KEY or GOOGLE_API_KEY == "YOUR_ACTUAL_GOOGLE_API_KEY_HERE": # Added a check for placeholder
+    st.error("🚨 GOOGLE_API_KEY not found or is still the placeholder. Please replace 'YOUR_ACTUAL_GOOGLE_API_KEY_HERE' with your actual key in the code.")
+    st.warning("Reminder: Hardcoding API keys is a security risk. Consider using Streamlit secrets or environment variables for better security.")
     st.stop()
 
 try:
@@ -41,8 +42,7 @@ except Exception as e:
     st.stop()
 
 # --- 2. Caching Functions for Loading Models and Index ---
-# These functions will be cached so models are not reloaded on every interaction.
-
+# (The rest of your code remains the same)
 @st.cache_resource
 def load_embeddings_model(model_name, device):
     """Loads the HuggingFace embedding model."""
@@ -145,7 +145,7 @@ else:
 # Load models and index
 embeddings_model = load_embeddings_model(EMBEDDING_MODEL_NAME, device)
 retriever = load_faiss_index(FAISS_SAVE_PATH, embeddings_model)
-llm = load_llm(GEMINI_MODEL_NAME, GOOGLE_API_KEY)
+llm = load_llm(GEMINI_MODEL_NAME, GOOGLE_API_KEY) # GOOGLE_API_KEY is now the hardcoded one
 
 # Get the RAG chain
 if retriever and llm:
@@ -178,9 +178,6 @@ if query := st.chat_input("What is your question?"):
         full_response = ""
         try:
             with st.spinner("Thinking... 🤔"):
-                # For a streaming response (if supported by your LLM and Langchain setup)
-                # For now, using invoke for a complete response
-                # For actual streaming with Gemini, you'd use llm.stream() and adapt the chain
                 answer = rag_chain.invoke(query)
                 full_response = answer
 
