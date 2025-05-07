@@ -46,13 +46,13 @@ except Exception as e:
 @st.cache_resource
 def load_embeddings_model(model_name, device):
     """Loads the HuggingFace embedding model."""
-    st.info(f"Loading embedding model: {model_name} on {device}...")
+    # st.info(f"Loading embedding model: {model_name} on {device}...")
     try:
         embeddings = HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs={'device': device}
         )
-        st.success("Embedding model loaded successfully!")
+        # st.success("Embedding model loaded successfully!")
         return embeddings
     except Exception as e:
         st.error(f"🚨 Error loading embedding model: {e}")
@@ -61,7 +61,7 @@ def load_embeddings_model(model_name, device):
 @st.cache_resource
 def load_faiss_index(save_path, _embeddings): # _embeddings to ensure it's passed for cache key
     """Loads the FAISS vector store."""
-    st.info(f"Loading FAISS index from: {save_path}...")
+    # st.info(f"Loading FAISS index from: {save_path}...")
     if not os.path.exists(save_path):
         st.error(f"🚨 Error: FAISS index directory '{save_path}' not found.")
         st.error("Please ensure the data vectorization script ran successfully and created the index in the correct location.")
@@ -73,7 +73,7 @@ def load_faiss_index(save_path, _embeddings): # _embeddings to ensure it's passe
             allow_dangerous_deserialization=True
         )
         retriever = db.as_retriever(search_kwargs={"k": 3})
-        st.success("FAISS index loaded and retriever created!")
+        # st.success("FAISS index loaded and retriever created!")
         return retriever
     except Exception as e:
         st.error(f"🚨 Error loading FAISS index: {e}")
@@ -83,7 +83,7 @@ def load_faiss_index(save_path, _embeddings): # _embeddings to ensure it's passe
 @st.cache_resource
 def load_llm(model_name, api_key):
     """Initializes the ChatGoogleGenerativeAI LLM."""
-    st.info(f"Initializing LLM: {model_name}...")
+    # st.info(f"Initializing LLM: {model_name}...")
     try:
         llm = ChatGoogleGenerativeAI(
             model=model_name,
@@ -91,7 +91,7 @@ def load_llm(model_name, api_key):
             temperature=0.3,
             # convert_system_message_to_human=True # May be needed for some models/prompts
         )
-        st.success("LLM initialized successfully!")
+        # st.success("LLM initialized successfully!")
         return llm
     except Exception as e:
         st.error(f"🚨 Error initializing LLM: {e}")
@@ -130,7 +130,7 @@ def get_rag_chain(_retriever, _llm):
     return rag_chain
 
 # --- 4. Streamlit App UI and Logic ---
-st.set_page_config(page_title="The Diplomat Chatbot", layout="wide")
+st.set_page_config(page_title="The Diplomat ", layout="wide")
 st.title("The Diplomat Chatbot")
 st.markdown("Ask questions about the documents mentioned, The system will retrieve relevant context and give you an answer.")
 
@@ -140,7 +140,7 @@ if device == "cuda":
     st.sidebar.success(f"Using GPU: {torch.cuda.get_device_name(0)}")
     torch.cuda.empty_cache()
 else:
-    st.sidebar.info("Using CPU. For faster processing, a GPU is recommended.")
+    # st.sidebar.info("Using CPU. For faster processing, a GPU is recommended.")
 
 # Load models and index
 embeddings_model = load_embeddings_model(EMBEDDING_MODEL_NAME, device)
@@ -193,11 +193,9 @@ if query := st.chat_input("What is your question?"):
 st.sidebar.markdown("---")
 st.sidebar.subheader("About")
 st.sidebar.info(
-    "This app uses a RAG pipeline with a FAISS vector store, "
-    f"HuggingFace embeddings ({EMBEDDING_MODEL_NAME}), "
-    f"and Google's Gemini model ({GEMINI_MODEL_NAME}) via LangChain."
+    "This app uses a RAG pipeline to generate the requested answers for you from various resources"
 )
-st.sidebar.markdown(
-    "**Important:** Ensure the `faiss_index_uploaded_data` directory "
-    " (containing your vectorized data) is in the same directory as this `app.py` file."
-)
+# st.sidebar.markdown(
+#     "**Important:** Ensure the `faiss_index_uploaded_data` directory "
+#     " (containing your vectorized data) is in the same directory as this `app.py` file."
+# )
