@@ -7,3 +7,4 @@ torch
 accelerate
 bitsandbytes
 pynvml # Optional, for detailed GPU stats in sidebar
+sentence-transformers 
