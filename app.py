@@ -16,7 +16,7 @@ GEMINI_MODEL_NAME = "models/gemini-1.5-flash-latest"
 GOOGLE_API_KEY = "AIzaSyBkjbOBbc8XpWGNN8lStFCnIbu3MO9vhug"
 
 # Set page configuration
-st.set_page_config(page_title="The Diplomat", layout="wide")
+st.set_page_config(page_title="Chatbot for International relations", layout="wide")
 
 # Hide Streamlit menu and footer
 hide_menu_style = """
