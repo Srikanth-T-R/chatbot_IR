@@ -1,10 +1,10 @@
+# requirements.txt
 streamlit
 langchain
-langchain-community
-faiss-cpu # Or faiss-gpu if you have a GPU enabled environment, but faiss-cpu is often sufficient for loading.
-transformers
+langchain-google-genai
+sentence-transformers
+faiss-cpu
 torch
 accelerate
-bitsandbytes
-pynvml # Optional, for detailed GPU stats in sidebar
-sentence-transformers 
+google-auth
+python-dotenv # Optional, for .env file method
