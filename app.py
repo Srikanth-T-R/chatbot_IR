@@ -170,8 +170,5 @@ if query := st.chat_input("What is your question?"):
 # Sidebar content
 st.sidebar.markdown("---")
 st.sidebar.subheader("About")
-st.sidebar.info(
-    "You can ask questions about the content in these academic resources:\n
-Essentials Of International Relations by Karen A. Mingst\nPax Indica\nDoes the Elephant Dance?: Contemporary Indian Foreign Policy\n
-Challenge and Strategy: Rethinking India's Foreign Policy\nInternational Relations: A Self-Study Guide"
+st.sidebar.info("You can ask questions about the content in these academic resources:Essentials Of International Relations by Karen A. Mingst, Pax Indica, Does the Elephant Dance?: Contemporary Indian Foreign Policy, Challenge and Strategy: Rethinking India's Foreign Policy, International Relations: A Self-Study Guide"
 )
