@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+
 import torch
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -172,3 +173,4 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("About")
 st.sidebar.info("You can ask questions about the content in these academic resources:Essentials Of International Relations by Karen A. Mingst, Pax Indica, Does the Elephant Dance?: Contemporary Indian Foreign Policy, Challenge and Strategy: Rethinking India's Foreign Policy, International Relations: A Self-Study Guide"
 )
+
