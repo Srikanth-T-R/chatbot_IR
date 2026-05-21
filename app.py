@@ -116,7 +116,6 @@ def get_rag_chain(_retriever, _llm):
         {"context": _retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
         | _llm
-        | _llm # Passing to LLM
         | StrOutputParser()
     )
     return rag_chain
