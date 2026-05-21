@@ -16,7 +16,7 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 # GEMINI_MODEL_NAME = "models/gemini-1.5-flash-latest"
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
 # GOOGLE_API_KEY = "AIzaSyBkjbOBbc8XpWGNN8lStFCnIbu3MO9vhug"
-GOOGLE_API_KEY = "AIzaSyCr9-hEUVURw5dhpZ9IDBjelUmJaCr-97A"
+GOOGLE_API_KEY = "AIzaSyCHclWzAhhsu3j2rs_U7Pa3CDcrmaTberc"
 
 # Set page configuration
 st.set_page_config(page_title="Chatbot for International relations", layout="wide")
