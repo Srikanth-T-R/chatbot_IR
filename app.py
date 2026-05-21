@@ -13,10 +13,7 @@ from langchain_core.output_parsers import StrOutputParser
 # Constants
 FAISS_SAVE_PATH = "faiss_index_uploaded_data"
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-# GEMINI_MODEL_NAME = "models/gemini-1.5-flash-latest"
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
-# GOOGLE_API_KEY = "AIzaSyBkjbOBbc8XpWGNN8lStFCnIbu3MO9vhug"
-GOOGLE_API_KEY = "AIzaSyDAAfoTIDpbm8cZT_QfAdMViO5FeQaKjuA"
 
 # Set page configuration
 st.set_page_config(page_title="Chatbot for International relations", layout="wide")
@@ -33,19 +30,24 @@ st.markdown(hide_menu_style, unsafe_allow_html=True)
 
 # Main app title
 st.title("Chatbot for International Relations")
-st.markdown("Ask questions about the documents mentioned, The system will retrieve relevant context and give you an answer.")
+st.markdown("Ask questions about the documents mentioned. The system will retrieve relevant context and give you an answer.")
+
+# Secure API key retrieval via Streamlit Secrets
+if "GOOGLE_API_KEY" in st.secrets:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+else:
+    GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 
 # API key validation
-if not GOOGLE_API_KEY or GOOGLE_API_KEY == "YOUR_ACTUAL_GOOGLE_API_KEY_HERE":
-    st.error("🚨 GOOGLE_API_KEY not found or is still the placeholder. Please replace 'YOUR_ACTUAL_GOOGLE_API_KEY_HERE' with your actual key in the code.")
-    st.warning("Reminder: Hardcoding API keys is a security risk. Consider using Streamlit secrets or environment variables for better security.")
+if not GOOGLE_API_KEY:
+    st.error("🚨 GOOGLE_API_KEY not found in Streamlit Secrets.")
+    st.info("Please go to your Streamlit Cloud dashboard, navigate to App Settings > Secrets, and add your key like this: GOOGLE_API_KEY = 'your_key'")
     st.stop()
 
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
 except Exception as e:
     st.error(f"🚨 Error configuring Google Generative AI SDK: {e}")
-    st.error("Please ensure your API key is valid and the Generative Language API is enabled in your Google Cloud Project.")
     st.stop()
 
 @st.cache_resource
@@ -64,7 +66,6 @@ def load_embeddings_model(model_name, device):
 def load_faiss_index(save_path, _embeddings):
     if not os.path.exists(save_path):
         st.error(f"🚨 Error: FAISS index directory '{save_path}' not found.")
-        st.error("Please ensure the data vectorization script ran successfully and created the index in the correct location.")
         st.stop()
     try:
         db = FAISS.load_local(
@@ -76,7 +77,6 @@ def load_faiss_index(save_path, _embeddings):
         return retriever
     except Exception as e:
         st.error(f"🚨 Error loading FAISS index: {e}")
-        st.error("Ensure the embedding model used here matches the one used for creating the index.")
         st.stop()
 
 @st.cache_resource
@@ -90,8 +90,6 @@ def load_llm(model_name, api_key):
         return llm
     except Exception as e:
         st.error(f"🚨 Error initializing LLM: {e}")
-        st.error("Please check your API key, model name, Google Cloud Project settings, and internet connection.")
-        st.error("Ensure the Generative Language API or Vertex AI API is enabled in your project and billing is active.")
         st.stop()
 
 def get_rag_chain(_retriever, _llm):
@@ -118,6 +116,7 @@ def get_rag_chain(_retriever, _llm):
         {"context": _retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
         | _llm
+        | _llm # Passing to LLM
         | StrOutputParser()
     )
     return rag_chain
@@ -173,6 +172,4 @@ if query := st.chat_input("What is your question?"):
 # Sidebar content
 st.sidebar.markdown("---")
 st.sidebar.subheader("About")
-st.sidebar.info("You can ask questions about the content in these academic resources:Essentials Of International Relations by Karen A. Mingst, Pax Indica, Does the Elephant Dance?: Contemporary Indian Foreign Policy, Challenge and Strategy: Rethinking India's Foreign Policy, International Relations: A Self-Study Guide"
-)
-
+st.sidebar.info("You can ask questions about the content in these academic resources: Essentials Of International Relations by Karen A. Mingst, Pax Indica, Does the Elephant Dance?: Contemporary Indian Foreign Policy, Challenge and Strategy: Rethinking India's Foreign Policy, International Relations: A Self-Study Guide")
